@@ -1,0 +1,65 @@
+#Cutadpt
+ORDER="6 12 24"
+for i in $ORDER
+
+do
+    cutadapt -a AGATCGGAAGAGC -A AGATCGGAAGAGC -o 01.Clean/Shoot-Control-${i}h_1.nonadapt.fq.gz -p 01.Clean/Shoot-Control-${i}h_2.nonadapt.fq.gz  ../BioResource/RawData/Shoot-Control-${i}h_1.fastq.gz ../BioResource/RawData/Shoot-Control-${i}h_2.fastq.gz
+    cutadapt -a AGATCGGAAGAGC -A AGATCGGAAGAGC -o 01.Clean/Shoot-PA01-${i}h_1.nonadapt.fq.gz -p 01.Clean/Shoot-PA01-${i}h_2.nonadapt.fq.gz  ../BioResource/RawData/Shoot-PA01-${i}h_1.fastq.gz ../BioResource/RawData/Shoot-PA01-${i}h_2.fastq.gz
+
+
+done
+#Trimming
+for i in $ORDER
+
+do
+    trimmomatic PE -threads 4 -summary 01.Clean/Shoot-Control-${i}h.trimmotic.log 01.Clean/Shoot-Control-${i}h_1.nonadapt.fq.gz 01.Clean/Shoot-Control-${i}h_2.nonadapt.fq.gz 01.Clean/Shoot-Control-${i}h_R1.qt.P.fastq.gz 01.Clean/Shoot-Control-${i}h_R1.qt.U.fastq.gz 01.Clean/Shoot-Control-${i}h_R2.qt.P.fastq.gz 01.Clean/Shoot-Control-${i}h_R2.qt.U.fastq.gz SLIDINGWINDOW:4:20 MINLEN:50
+    trimmomatic PE -threads 4 -summary 01.Clean/Shoot-PA01-${i}h.trimmotic.log 01.Clean/Shoot-PA01-${i}h_1.nonadapt.fq.gz 01.Clean/Shoot-PA01-${i}h_2.nonadapt.fq.gz 01.Clean/Shoot-PA01-${i}h_R1.qt.P.fastq.gz 01.Clean/Shoot-PA01-${i}h_R1.qt.U.fastq.gz 01.Clean/Shoot-PA01-${i}h_R2.qt.P.fastq.gz 01.Clean/Shoot-PA01-${i}h_R2.qt.U.fastq.gz SLIDINGWINDOW:4:20 MINLEN:50
+
+done
+
+#Align
+for i in $ORDER
+
+do
+    mkdir 02.Align
+    tophat -o 02.Align/Shoot-Control-${i}h -p 4 -r 250 --mate-std-dev 50 --library-type fr-unstranded -G ../BioResource/GeneModel/Arabidopsis_thaliana.TAIR10.44.gtf --rg-id control --rg-sample Shoot-Control-${i}h ../BioResource/Reference/Arabidopsis_thaliana.TAIR10.dna.toplevel.fa 01.Clean/Shoot-Control-${i}h_R1.qt.P.fastq.gz 01.Clean/Shoot-Control-${i}h_R2.qt.P.fastq.gz
+    tophat -o 02.Align/Shoot-PA01-${i}h -p 4 -r 250 --mate-std-dev 50 --library-type fr-unstranded -G ../BioResource/GeneModel/Arabidopsis_thaliana.TAIR10.44.gtf --rg-id experiment --rg-sample Shoot-PA01-${i}h ../BioResource/Reference/Arabidopsis_thaliana.TAIR10.dna.toplevel.fa 01.Clean/Shoot-PA01-${i}h_R1.qt.P.fastq.gz 01.Clean/Shoot-PA01-${i}h_R2.qt.P.fastq.gz
+
+done
+
+#Cuffquant
+for i in $ORDER
+
+do
+    mkdir 03.Cuffquant
+    cuffquant --output-dir 03.Cuffquant/Shoot-Control-${i}h --frag-bias-correct ../BioResource/Reference/Arabidopsis_thaliana.TAIR10.dna.toplevel.fa --multi-read-correct --num-threads 4 --library-type fr-unstranded --mask-file ../BioResource/GeneModel/Arabidopsis_thaliana.TAIR10.44.mask.gtf ../BioResource/GeneModel/Arabidopsis_thaliana.TAIR10.44.gtf 02.Align/Shoot-Control-${i}h/accepted_hits.bam
+    cuffquant --output-dir 03.Cuffquant/Shoot-PA01-${i}h --frag-bias-correct ../BioResource/Reference/Arabidopsis_thaliana.TAIR10.dna.toplevel.fa --multi-read-correct --num-threads 4 --library-type fr-unstranded --mask-file ../BioResource/GeneModel/Arabidopsis_thaliana.TAIR10.44.mask.gtf ../BioResource/GeneModel/Arabidopsis_thaliana.TAIR10.44.gtf 02.Align/Shoot-PA01-${i}h/accepted_hits.bam
+
+done
+
+
+
+
+#Cuffnorm
+mkdir 04.Cuffnorm
+cuffnorm --output-dir 04.Cuffnorm --labels Control,Experiment --num-threads 4 --library-type fr-unstranded --library-norm-method classic-fpkm --output-format simple-table ../BioResource/GeneModel/Arabidopsis_thaliana.TAIR10.44.gtf 03.Cuffquant/Shoot-Control-6h/abundances.cxb,03.Cuffquant/Shoot-Control-12h/abundances.cxb,03.Cuffquant/Shoot-Control-24h/abundances.cxb 03.Cuffquant/Shoot-PA01-6h/abundances.cxb,03.Cuffquant/Shootoot-PA01-12h/abundances.cxb,03.Cuffquant/Shoot-PA01-24h/abundances.cxb
+
+
+#Cuffdiff
+mkdir 05.Cuffdiff
+cuffdiff --output-dir 05.Cuffdiff --labels Control,Experiment --frag-bias-correct ../BioResource/Reference/Arabidopsis_thaliana.TAIR10.dna.toplevel.fa --multi-read-correct --num-threads 4 --library-type fr-unstranded --library-norm-method classic-fpkm --dispersion-method pooled ../BioResource/GeneModel/Arabidopsis_thaliana.TAIR10.44.gtf 03.Cuffquant/Shoot-Control-6h/abundances.cxb,03.Cuffquant/Shoot-Control-12h/abundances.cxb,03.Cuffquant/Shoot-Control-24h/abundances.cxb 03.Cuffquant/Shoot-PA01-6h/abundances.cxb,03.Cuffquant/Shoot-PA01-12h/abundances.cxb,03.Cuffquant/Shoot-PA01-24h/abundances.cxb
+
+#TCC
+for i in $ORDER
+
+do
+
+    mkdir 03.TCC
+    samtools sort -n 02.Align/Shoot-Control-${i}h/accepted_hits.bam -o 02.Align/Shoot-Control-${i}h/accepted_hits.nameSorted.bam
+    htseq-count -f bam -r name -s no -m intersection-strict -o 02.Align/Shoot-Control-${i}h/accepted_hits.nameSorted.bam.SAMOUT 02.Align/Shoot-Control-${i}h/accepted_hits.nameSorted.bam ../BioResource/GeneModel/Arabidopsis_thaliana.TAIR10.44.gtf > 03.TCC/Shoot-Control-${i}h.count
+    samtools sort -n 02.Align/Shoot-PA01-${i}h/accepted_hits.bam -o 02.Align/Shoot-PA01-${i}h/accepted_hits.nameSorted.bam
+    htseq-count -f bam -r name -s no -m intersection-strict -o 02.Align/Shoot-PA01-${i}h/accepted_hits.nameSorted.bam.SAMOUT 02.Align/Shoot-PA01-${i}h/accepted_hits.nameSorted.bam ../BioResource/GeneModel/Arabidopsis_thaliana.TAIR10.44.gtf > 03.TCC/Shoot-PA01-${i}h.count
+
+
+done
+
